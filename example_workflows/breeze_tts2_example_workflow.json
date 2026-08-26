@@ -73,7 +73,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
-        "ver": "1.1.0",
+        "ver": "1.2.0",
         "Node name for S&R": "BreezeTTS2LoadModel"
       },
       "widgets_values": [
@@ -130,7 +130,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
-        "ver": "1.1.0",
+        "ver": "1.2.0",
         "Node name for S&R": "BreezeTTS2VoiceClone"
       },
       "widgets_values": [
@@ -253,7 +253,7 @@
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
-        "ver": "1.1.0",
+        "ver": "1.2.0",
         "Node name for S&R": "BreezeWhisperTranscribe"
       },
       "widgets_values": [

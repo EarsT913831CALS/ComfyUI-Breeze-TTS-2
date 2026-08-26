@@ -202,14 +202,24 @@ def _generate_audio(
         depth_top_p=float(depth_top_p),
     )
 
-    pbar = ProgressBar(params.max_new_tokens) if ProgressBar is not None else None
-    cli_pbar = tqdm(total=params.max_new_tokens, desc="Breeze TTS 2 frames", unit="frame", dynamic_ncols=True, leave=True) if tqdm is not None else None
+    est_frames = min(runtime.estimate_speech_frames(bundle.tokenizer, text), max_frames)
+    logger.info(
+        "Prompt: %d tokens | approx %ds of speech (%d frames, cap %d) | cfg %.1f",
+        prefill_len, est_frames / runtime.FRAMES_PER_SECOND, est_frames, max_frames, float(cfg_scale),
+    )
 
-    def progress_callback(current: int, total: int) -> None:
+    pbar = ProgressBar(max_frames) if ProgressBar is not None else None
+    cli_pbar = (
+        tqdm(total=est_frames, desc="Breeze TTS 2 (~%.0fs)" % (est_frames / runtime.FRAMES_PER_SECOND),
+             unit="frame", dynamic_ncols=True, leave=True)
+        if tqdm is not None else None
+    )
+
+    def progress_callback(current: int) -> None:
         if pbar is not None:
-            pbar.update_absolute(min(current, total), total)
-        if cli_pbar is not None:
-            cli_pbar.update(1)
+            pbar.update_absolute(min(current, max_frames), max_frames)
+        if cli_pbar is not None and current > cli_pbar.n:
+            cli_pbar.update(current - cli_pbar.n)
 
     try:
         with torch.inference_mode(), native.attention_runtime(bundle.attention):
