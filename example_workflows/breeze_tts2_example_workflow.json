@@ -1,0 +1,315 @@
+{
+  "id": "breeze-tts-2-voice-clone",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        12,
+        -109
+      ],
+      "size": [
+        390,
+        300
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Breeze TTS 2\n\n[Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) is BreezeBlue's open-weight real-time TTS model: it ranks #1 among open-weight models on the Artificial Analysis TTS leaderboard and speaks natural **English and Chinese** from a single checkpoint.\n\n## ComfyUI links\n- [saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/saganaki22/ComfyUI-Breeze-TTS-2)\n- [drbaph/Breeze-TTS-2-comfyui](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui) (bf16 + int8 builds; the loader auto-downloads)\n\n## About this workflow\n\nVoice cloning: **Load Model** -> **Whisper Transcribe** (builds the reference transcript) -> **Voice Clone**.\n\n**Key inputs**\n\n- **model**: `int8-hybrid` (default - bf16 speed at ~5.5 GiB peak VRAM), `bf16` (fastest, ~7.5 GiB), `int8-convrot` (smallest, ~5.2 GiB, slower decode), `int8-text-encoder` (decode path bf16)\n- **dtype / attention**: auto picks bf16 + flash_attention (falls back to sdpa); sageattention is supported\n- **reference_audio / reference_text**: a clean clip and its exact transcript (the Whisper node transcribes for you)\n- **text**: vocal events work inline - `(laugh)`, `(sigh)`, `(cough)`, `(clears throat)` in English, `[\u7b11]`, `[\u53f9\u6c14]` in Chinese\n- **cfg_scale**: 1.0 clones the reference as-is; the Design/Direction nodes default to 4 for instruction-following\n- **seed**: repeatable when positive, 0 keeps the current random state\n\nTry the **Voice Design** node for reference-free synthesis and **Voice Direction** to steer a cloned voice with an instruction. Output is 24 kHz mono."
+      ]
+    },
+    {
+      "id": 2,
+      "type": "MarkdownNote",
+      "pos": [
+        12,
+        230
+      ],
+      "size": [
+        390,
+        240
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Model files\nThe loader downloads into `ComfyUI/models/breezetts2/drbaph_Breeze-TTS-2-comfyui/` when `download_if_missing` is on; only the selected weights file plus the shared configs and `audio_tokenizer/` codec are fetched.\n\n- [Breeze-TTS-2-bf16.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-bf16.safetensors) - bf16, official shards merged bit-exact (6.49 GiB)\n- [Breeze-TTS-2-int8-hybrid.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-hybrid.safetensors) - recommended int8 build (4.53 GiB, bf16-level speed)\n- [Breeze-TTS-2-int8-convrot.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-convrot.safetensors) - all 462 linears quantized (4.22 GiB)\n- [Breeze-TTS-2-int8-text-encoder.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-text-encoder.safetensors) - decode path bf16 (5.84 GiB)\n- `audio_tokenizer/` - Qwen3-TTS 12 Hz codec, shared by every build\n\nWeights are research / non-commercial use only (BreezeBlue license)."
+      ]
+    },
+    {
+      "id": 3,
+      "type": "BreezeTTS2LoadModel",
+      "pos": [
+        440,
+        12
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "breeze_model",
+          "type": "BREEZE_TTS2_MODEL",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-breeze-tts-2",
+        "ver": "1.1.0",
+        "Node name for S&R": "BreezeTTS2LoadModel"
+      },
+      "widgets_values": [
+        "int8 hybrid (recommended)",
+        "auto",
+        "auto",
+        "auto",
+        true
+      ]
+    },
+    {
+      "id": 4,
+      "type": "BreezeTTS2VoiceClone",
+      "pos": [
+        830,
+        12
+      ],
+      "size": [
+        440,
+        500
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "breeze_model",
+          "type": "BREEZE_TTS2_MODEL",
+          "link": 1
+        },
+        {
+          "name": "reference_audio",
+          "type": "AUDIO",
+          "link": 4
+        },
+        {
+          "name": "reference_text",
+          "type": "STRING",
+          "widget": {
+            "name": "reference_text"
+          },
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-breeze-tts-2",
+        "ver": "1.1.0",
+        "Node name for S&R": "BreezeTTS2VoiceClone"
+      },
+      "widgets_values": [
+        "(sigh) It is good to hear your voice again after all this time.",
+        "",
+        1.0,
+        1500,
+        0.9,
+        50,
+        1.0,
+        1.1,
+        0.9,
+        50,
+        1.0,
+        42
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewAudio",
+      "pos": [
+        1320,
+        12
+      ],
+      "size": [
+        320,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 6,
+      "type": "LoadAudio",
+      "pos": [
+        440,
+        260
+      ],
+      "size": [
+        350,
+        130
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio",
+        "widgets": {
+          "upload": "audio"
+        }
+      },
+      "widgets_values": [
+        "reference.wav",
+        null,
+        null
+      ]
+    },
+    {
+      "id": 7,
+      "type": "BreezeWhisperTranscribe",
+      "pos": [
+        440,
+        430
+      ],
+      "size": [
+        350,
+        220
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "transcript",
+          "type": "STRING",
+          "links": [
+            5
+          ],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-breeze-tts-2",
+        "ver": "1.1.0",
+        "Node name for S&R": "BreezeWhisperTranscribe"
+      },
+      "widgets_values": [
+        "whisper-large-v3-turbo",
+        "auto",
+        "auto",
+        "transcribe",
+        30,
+        true
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      4,
+      0,
+      "BREEZE_TTS2_MODEL"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "AUDIO"
+    ],
+    [
+      3,
+      6,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ],
+    [
+      4,
+      7,
+      0,
+      4,
+      1,
+      "AUDIO"
+    ],
+    [
+      5,
+      7,
+      1,
+      4,
+      2,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

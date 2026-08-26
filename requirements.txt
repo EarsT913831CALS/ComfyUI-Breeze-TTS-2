@@ -1,0 +1,8 @@
+# torch, torchaudio, and transformers are intentionally not pinned here.
+# This nodepack is built for the Transformers shipped by current ComfyUI (5.3+).
+accelerate
+numpy
+safetensors
+soundfile
+huggingface_hub
+tqdm
