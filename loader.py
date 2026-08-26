@@ -36,7 +36,7 @@ REPO_CHOICES: dict[str, tuple[str, str]] = {
 
 DTYPE_OPTIONS = ["auto", "bf16", "fp32"]
 DEVICE_OPTIONS = ["auto", "cuda", "cpu"]
-ATTENTION_OPTIONS = ["auto", "sdpa", "flash_attention", "sageattention"]
+ATTENTION_OPTIONS = ["auto", "eager", "sdpa", "flash_attention", "sageattention"]
 
 SMALL_FILE_PATTERNS = [
     "config.json",
@@ -61,6 +61,33 @@ except Exception:
     mm = None
     model_patcher = None
     _ComfyCorePatcher = None
+
+
+if model_patcher is not None:
+    class _BreezeModelPatcher(model_patcher.ModelPatcher):
+        # ModelPatcher.__del__ touches module globals (CallbacksMP) that are
+        # already torn down when our long-lived patchers get collected during
+        # interpreter shutdown. Detach happens eagerly on unload, so __del__
+        # is only a fallback and must never print unraisable teardown noise.
+        def __del__(self):
+            try:
+                super().__del__()
+            except Exception:
+                pass
+
+    _DynamicBase = getattr(model_patcher, "ModelPatcherDynamic", None)
+    if _DynamicBase is not None:
+        class _BreezeModelPatcherDynamic(_DynamicBase):
+            def __del__(self):
+                try:
+                    super().__del__()
+                except Exception:
+                    pass
+    else:
+        _BreezeModelPatcherDynamic = None
+else:
+    _BreezeModelPatcher = None
+    _BreezeModelPatcherDynamic = None
 
 
 def _safe_repo_name(repo_id: str) -> str:
@@ -185,6 +212,8 @@ def resolve_attention(attention: str, device: torch.device, dtype_mode: str) -> 
     )
     if attention == "auto":
         return "flash_attention_2" if flash_usable else "sdpa"
+    if attention == "eager":
+        return "eager"
     if attention == "sdpa":
         return "sdpa"
     if attention == "flash_attention":
@@ -280,7 +309,10 @@ def register_runtime_module(module: nn.Module, device: torch.device, *, dynamic:
         module.to(device)
         return None
     use_dynamic = dynamic_vram_active(device) and dynamic is not False
-    patcher_class = model_patcher.ModelPatcherDynamic if use_dynamic else model_patcher.ModelPatcher
+    if use_dynamic and _BreezeModelPatcherDynamic is not None:
+        patcher_class = _BreezeModelPatcherDynamic
+    else:
+        patcher_class = _BreezeModelPatcher
     patcher = patcher_class(module, load_device=device, offload_device=torch.device("cpu"))
     module.model_loaded_weight_memory = 0
     _register_many_with_comfy([patcher])
