@@ -14,7 +14,7 @@ INT8 ConvRot 量化构建，并完整集成 ComfyUI / AIMDO 动态显存管理�
 
 | 节点 | 用途 |
 | --- | --- |
-| **Breeze TTS 2 Load Model** | 加载检查点，支持 `dtype`（auto/bf16/fp32）、`device`（auto/cuda/cpu）、`attention`（auto/eager/sdpa/flash_attention/sageattention）以及 `download_if_missing`。 |
+| **Breeze TTS 2 Load Model** | 加载检查点，支持 `dtype`（auto/bf16/fp32）、`device`（auto/cuda/cpu）、`attention`（auto/eager/sdpa/flash_attention/sageattention）、`decode_mode`（eager/cuda_graphs）以及 `download_if_missing`。 |
 | **Breeze TTS 2 Voice Clone** | 通过干净的参考音频 + 精确转写文本克隆说话人（CFG 1.0）。 |
 | **Breeze TTS 2 Voice Design** | 通过自然语言描述创建声音，无需参考音频（CFG 4）。 |
 | **Breeze TTS 2 Voice Direction** | 克隆参考声音，并用指令控制语气、情绪、语速和表达方式（CFG 4）。`stitch_reference` 可将原始参考片段拼接到生成语音之前或之后输出。 |
@@ -90,8 +90,9 @@ INT8 ConvRot 量化构建，并完整集成 ComfyUI / AIMDO 动态显存管理�
 ## 运行要求
 
 - 搭载 **Transformers 4.57 或 5.3+** 的 ComfyUI。5.x 下文本编码器使用原生
-  `T5Gemma2TextEncoder`（无 flash-attention 内核——选择 `flash_attention` 时会回退到 sdpa）；
-  4.x 下使用随附的上游兼容实现，可以运行 flash attention。
+  `T5Gemma2TextEncoder`，并通过自定义注册的 FA2 路径运行 flash attention
+  （上游因 softcapping 顾虑禁用了它，但本检查点并不涉及）；4.x 下使用随附的上游兼容实现，
+  同样可以运行 flash attention。
 - torch/torchaudio 来自你的 ComfyUI 安装。`flash_attn` 与 `sageattention` 为可选项。
 - `comfy-kitchen` 随当前 ComfyUI 附带，仅在加载 INT8 检查点时才会导入。
 
@@ -107,7 +108,10 @@ INT8 ConvRot 量化构建，并完整集成 ComfyUI / AIMDO 动态显存管理�
 
 eager 生成循环重新实现了官方 `FastBreezeStreamingRuntime`，并关闭所有快速
 阶段（用 DynamicCache 替代 CUDA graph），以保持与 AIMDO 动态显存分页及 INT8 权重
-转换的兼容性。官方 CUDA-graph 快速路径有意未移植。
+转换的兼容性。使用 `decode_mode=cuda_graphs` 时，深度解码步骤会被捕获为
+CUDA graph——捕获后的解码比走 AIMDO 分页的 eager 路径**快 7–9 倍**
+（整段生成约快 3–4 倍）；该模式下模型权重常驻显存，不再由 AIMDO 分页。
+官方 CUDA-graph 快速路径有意未移植。
 
 ## 许可证
 

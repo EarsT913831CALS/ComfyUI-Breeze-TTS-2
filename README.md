@@ -19,7 +19,7 @@ INT8 ConvRot quantized builds, and full ComfyUI / AIMDO dynamic-VRAM integration
 
 | Node | Purpose |
 | --- | --- |
-| **Breeze TTS 2 Load Model** | Loads the checkpoint with `dtype` (auto/bf16/fp32), `device` (auto/cuda/cpu), `attention` (auto/eager/sdpa/flash_attention/sageattention), and `download_if_missing`. |
+| **Breeze TTS 2 Load Model** | Loads the checkpoint with `dtype` (auto/bf16/fp32), `device` (auto/cuda/cpu), `attention` (auto/eager/sdpa/flash_attention/sageattention), `decode_mode` (eager/cuda_graphs), and `download_if_missing`. |
 | **Breeze TTS 2 Voice Clone** | Clones a speaker from clean reference audio + its exact transcript (CFG 1.0). |
 | **Breeze TTS 2 Voice Design** | Creates a voice from a natural-language description, no reference audio (CFG 4). |
 | **Breeze TTS 2 Voice Direction** | Clones a reference voice and steers tone, emotion, pace, and delivery with an instruction (CFG 4). `stitch_reference` can play the original reference clip before or after the generated speech in the output. |
@@ -96,9 +96,9 @@ data is in `benchmark_report.json` on the mirror repo.
 ## Requirements
 
 - ComfyUI with **Transformers 4.57 or 5.3+**. On 5.x the text encoder uses the native
-  `T5Gemma2TextEncoder` (which has no flash-attention kernel — it falls back to sdpa when
-  `flash_attention` is selected); on 4.x it uses the vendored upstream compat implementation,
-  which does run flash attention.
+  `T5Gemma2TextEncoder` wired into flash attention through a custom-registered FA2 path
+  (upstream blocks it over softcapping concerns this checkpoint does not have); on 4.x it
+  uses the vendored upstream compat implementation, which also runs flash attention.
 - torch/torchaudio from your ComfyUI install. `flash_attn` and `sageattention` are optional.
 - `comfy-kitchen` ships with current ComfyUI and is only imported when an INT8 checkpoint is loaded.
 
@@ -115,7 +115,10 @@ data is in `benchmark_report.json` on the mirror repo.
 
 The eager generation loop reimplements the official `FastBreezeStreamingRuntime` with all fast
 stages disabled (DynamicCache instead of CUDA graphs) so it stays compatible with AIMDO dynamic
-VRAM paging and INT8 weight casting. The official CUDA-graph fast path is intentionally not ported.
+VRAM paging and INT8 weight casting. With `decode_mode=cuda_graphs` the depth decode steps are
+captured into CUDA graphs instead — the captured decode runs **7–9x faster** than the eager
+AIMDO-paged path (~3–4x faster end-to-end generation); that mode keeps the model weights
+VRAM-resident rather than AIMDO-paged. The official CUDA-graph fast path is intentionally not ported.
 
 ## License
 

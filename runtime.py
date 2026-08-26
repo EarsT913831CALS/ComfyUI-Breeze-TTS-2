@@ -301,15 +301,24 @@ def _new_static_cache(config, max_cache_len: int, batch: int, device, dtype):
     return StaticCache(**kwargs)
 
 
+class _GraphFallback(Exception):
+    pass
+
+
 class _DepthRunner:
     """Depth decoder hot loop with everything precomputable precomputed.
 
     The official CUDA-graph path precomputed rope, per-position attention
     masks, cache positions, and a static KV cache once; this does the same for
-    the eager path. Per frame it only runs the 16 forward steps themselves.
+    the eager path. With use_graph the per-step forwards are additionally
+    captured into CUDA graphs by hand (inductor's cudagraph trees cannot
+    record under ComfyUI's default cudaMallocAsync allocator). Graph replay
+    pins the weight addresses it captured, so the loader registers the model
+    non-dynamic (AIMDO paging off) in that mode. Runners are stored on the
+    model keyed by batch size so captured graphs persist across generations.
     """
 
-    def __init__(self, model, params: GenerationParams, cfg_scale: float):
+    def __init__(self, model, params: GenerationParams, cfg_scale: float, use_graph: bool = False):
         self.model = model
         self.depth = model.depth_decoder.model
         self.head = model.depth_decoder.codebooks_head
@@ -318,6 +327,10 @@ class _DepthRunner:
         self.num_decode = model.config.num_codebooks - 1
         self.params = params
         self.cfg_scale = cfg_scale
+        self.use_graph = use_graph
+        self._graph_prefill = None
+        self._graph_steps = None
+        self._capture_after_frame = False
         self._ready = False
 
     def _prepare(self, batch: int, device, dtype):
@@ -345,7 +358,94 @@ class _DepthRunner:
         self._positions = [torch.tensor([t], device=device) for t in range(2, length)]
         self._offsets = [i * self.vocab for i in range(self.num_decode)]
         self._prefill_pos = torch.arange(2, device=device)
+        self._prefill_rope = (self._cos[:2].unsqueeze(0), self._sin[:2].unsqueeze(0))
+        self._rope_steps = [
+            (self._cos[t : t + 1].unsqueeze(0), self._sin[t : t + 1].unsqueeze(0))
+            for t in range(2, length)
+        ]
         self._ready = True
+
+    def _prefill_forward(self, embeds: torch.Tensor) -> torch.Tensor:
+        hidden = embeds
+        for layer in self.depth.layers:
+            hidden = layer(
+                hidden,
+                attention_mask=self._prefill_mask,
+                past_key_values=self.cache,
+                use_cache=True,
+                cache_position=self._prefill_pos,
+                position_embeddings=self._prefill_rope,
+            )
+        hidden = self.depth.norm(hidden)
+        return self.head(hidden[:, 1:, :].float(), cache_position=self._prefill_pos[1:])
+
+    def _step_forward(self, emb, mask, cos, sin, cache_position) -> torch.Tensor:
+        hidden = emb
+        for layer in self.depth.layers:
+            hidden = layer(
+                hidden,
+                attention_mask=mask,
+                past_key_values=self.cache,
+                use_cache=True,
+                cache_position=cache_position,
+                position_embeddings=(cos, sin),
+            )
+        hidden = self.depth.norm(hidden)
+        return self.head(hidden.float(), cache_position=cache_position)
+
+    def _record(self, fn, static_in: torch.Tensor, *consts):
+        # torch.compile's inductor cudagraphs cannot capture under ComfyUI's
+        # default cudaMallocAsync allocator (triton rejects pool pointers), so
+        # capture the eager steps manually: only static_in varies per call,
+        # the precomputed masks/rope/positions are captured by reference.
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            for _ in range(2):
+                fn(static_in, *consts)
+        torch.cuda.current_stream().wait_stream(stream)
+        graph = torch.cuda.CUDAGraph()
+        # thread_local: ComfyUI's server thread (and monitor custom nodes)
+        # poll CUDA stats from other threads; process-global capture treats
+        # any such call during capture as fatal. Capture is per-thread here.
+        with torch.cuda.graph(graph, capture_error_mode="thread_local"):
+            static_out = fn(static_in, *consts)
+        return graph, static_in, static_out
+
+    def _maybe_capture(self, prefill_shape, step_shape, device, dtype) -> None:
+        if not self.use_graph or self._graph_prefill is not None:
+            return
+        try:
+            prefill_in = torch.zeros(prefill_shape, device=device, dtype=dtype)
+            self._graph_prefill = self._record(self._prefill_forward, prefill_in)
+            steps = []
+            for cb_idx in range(1, self.num_decode):
+                step_in = torch.zeros(step_shape, device=device, dtype=dtype)
+                cos, sin = self._rope_steps[cb_idx - 1]
+                consts = (self._decode_masks[cb_idx - 1], cos, sin, self._positions[cb_idx - 1])
+                steps.append(self._record(self._step_forward, step_in, *consts))
+            self._graph_steps = steps
+        except Exception:
+            logger.warning("cuda_graphs: capture failed; depth decode falls back to eager.", exc_info=True)
+            self.use_graph = False
+            self._graph_prefill = None
+            self._graph_steps = None
+
+    def _call(self, entry, eager, data, *args) -> torch.Tensor:
+        if entry is None:
+            return eager(data, *args)
+        graph, static_in, static_out = entry
+        try:
+            static_in.copy_(data)
+            graph.replay()
+            # Clone: the static output buffer is overwritten by the next replay.
+            return static_out.clone()
+        except Exception:
+            logger.warning("cuda_graphs: replay failed; depth decode falls back to eager.", exc_info=True)
+            self.use_graph = False
+            self._graph_prefill = None
+            self._graph_steps = None
+            raise _GraphFallback()
 
     def _sample(self, logits: torch.Tensor) -> torch.Tensor:
         half = logits.shape[0] // 2
@@ -366,6 +466,13 @@ class _DepthRunner:
 
     def run(self, backbone_hidden: torch.Tensor, first_token: torch.Tensor) -> torch.Tensor:
         """Returns the 15 remaining codebook tokens for one frame."""
+        while True:
+            try:
+                return self._run_frame(backbone_hidden, first_token)
+            except _GraphFallback:
+                continue  # graphs are disabled by _call; the retry is eager
+
+    def _run_frame(self, backbone_hidden: torch.Tensor, first_token: torch.Tensor) -> torch.Tensor:
         depth = self.depth
         batch = backbone_hidden.shape[0]
         device = backbone_hidden.device
@@ -383,48 +490,49 @@ class _DepthRunner:
         embeds[:, 0] = backbone_h
         embeds = depth.inputs_embeds_projector(embeds)
 
-        cache_position = self._prefill_pos
-        position_embeddings = (self._cos[:2].unsqueeze(0), self._sin[:2].unsqueeze(0))
-        hidden = embeds
-        for layer in depth.layers:
-            hidden = layer(
-                hidden,
-                attention_mask=self._prefill_mask,
-                past_key_values=self.cache,
-                use_cache=True,
-                cache_position=cache_position,
-                position_embeddings=position_embeddings,
-            )
-        hidden = depth.norm(hidden)
-        logits = self.head(hidden[:, 1:, :].float(), cache_position=cache_position[1:])
+        if self.use_graph and self._graph_prefill is None and not self._capture_after_frame:
+            # First frame stays eager: it lazily allocates the static cache
+            # tensors and gives us the real input shapes to capture with.
+            self._capture_after_frame = True
+            self._capture_shapes = (embeds.shape, device, dtype)
+        logits = self._call(self._graph_prefill, self._prefill_forward, embeds)
         token = self._sample(logits)
         tokens = [token]
 
+        step_shape = None
         for cb_idx in range(1, self.num_decode):
             offset_tok = (token + self._offsets[cb_idx]).repeat(batch)
             emb = depth.embed_tokens(offset_tok.unsqueeze(1).clamp_(0, self.model.config.num_codebooks * self.vocab - 1))
             emb = depth.inputs_embeds_projector(emb)
-            cache_position = self._positions[cb_idx - 1]
-            position_embeddings = (
-                self._cos[cache_position[0] : cache_position[0] + 1].unsqueeze(0),
-                self._sin[cache_position[0] : cache_position[0] + 1].unsqueeze(0),
-            )
-            hidden = emb
-            for layer in depth.layers:
-                hidden = layer(
-                    hidden,
-                    attention_mask=self._decode_masks[cb_idx - 1],
-                    past_key_values=self.cache,
-                    use_cache=True,
-                    cache_position=cache_position,
-                    position_embeddings=position_embeddings,
-                )
-            hidden = depth.norm(hidden)
-            logits = self.head(hidden.float(), cache_position=cache_position)
+            if step_shape is None:
+                step_shape = emb.shape
+            if self._graph_steps is not None:
+                logits = self._call(self._graph_steps[cb_idx - 1], self._step_forward, emb)
+            else:
+                cos, sin = self._rope_steps[cb_idx - 1]
+                logits = self._step_forward(emb, self._decode_masks[cb_idx - 1], cos, sin, self._positions[cb_idx - 1])
             token = self._sample(logits)
             tokens.append(token)
 
+        if self._capture_after_frame:
+            self._capture_after_frame = False
+            prefill_shape, cap_device, cap_dtype = self._capture_shapes
+            self._maybe_capture(prefill_shape, step_shape, cap_device, cap_dtype)
         return torch.cat(tokens, dim=0)
+
+
+def get_depth_runner(model, params: GenerationParams, cfg_scale: float, batch: int, use_graph: bool) -> _DepthRunner:
+    runners = getattr(model, "_breeze_depth_runners", None)
+    if runners is None:
+        runners = model._breeze_depth_runners = {}
+    runner = runners.get(batch)
+    if runner is None:
+        runner = _DepthRunner(model, params, cfg_scale, use_graph=use_graph)
+        runners[batch] = runner
+    else:
+        runner.params = params
+        runner.cfg_scale = cfg_scale
+    return runner
 
 
 @torch.inference_mode()
@@ -438,6 +546,7 @@ def generate_codes(
     cfg_scale: float,
     params: GenerationParams,
     progress_callback: Callable[[int], None] | None = None,
+    decode_mode: str = "eager",
 ) -> torch.Tensor:
     """Run the eager backbone + depth-decoder loop; returns codec codes [num_frames, 16]."""
     device = inputs_embeds.device
@@ -445,6 +554,10 @@ def generate_codes(
     vocab = config.vocab_size
     num_codebooks = config.num_codebooks
     reserved = tuple(range(int(config.codec_codebook_size), vocab))
+    use_graph = decode_mode == "cuda_graphs"
+    if use_graph and device.type != "cuda":
+        logger.warning("cuda_graphs decode mode requires a CUDA device; using eager decode.")
+        use_graph = False
 
     position_ids = attention_mask.long().cumsum(-1) - 1
     position_ids.masked_fill_(attention_mask == 0, 1)
@@ -473,8 +586,8 @@ def generate_codes(
         suppress_tokens=reserved,
     ).view(1)
 
-    depth = _DepthRunner(model, params, cfg_scale)
     batch = inputs_embeds.shape[0]
+    depth = get_depth_runner(model, params, cfg_scale, batch, use_graph)
     # Preallocated attention mask and token history, like the official graph
     # path: step t slices a view instead of concatenating growing tensors.
     mask_buffer = torch.ones(batch, prefill_len + params.max_new_tokens + 1, dtype=attention_mask.dtype, device=device)

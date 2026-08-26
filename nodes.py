@@ -10,7 +10,7 @@ import torch
 from . import loader
 from . import native
 from . import runtime
-from .loader import ATTENTION_OPTIONS, DEVICE_OPTIONS, DTYPE_OPTIONS, REPO_CHOICES
+from .loader import ATTENTION_OPTIONS, DECODE_MODE_OPTIONS, DEVICE_OPTIONS, DTYPE_OPTIONS, REPO_CHOICES
 
 logger = logging.getLogger("BreezeTTS2")
 
@@ -107,6 +107,17 @@ class BreezeTTS2LoadModel:
                     ATTENTION_OPTIONS,
                     {"default": "auto", "tooltip": "auto uses flash_attention_2 when flash_attn is installed, else sdpa."},
                 ),
+                "decode_mode": (
+                    DECODE_MODE_OPTIONS,
+                    {
+                        "default": "eager",
+                        "tooltip": (
+                            "cuda_graphs captures the depth decode loop into CUDA graphs: much faster, but the "
+                            "model weights stay fully resident in VRAM (AIMDO paging is bypassed for it) and the "
+                            "first generation spends a couple of seconds capturing the graphs."
+                        ),
+                    },
+                ),
                 "download_if_missing": (
                     "BOOLEAN",
                     {"default": True, "tooltip": "Download the selected checkpoint from Hugging Face when missing locally."},
@@ -120,8 +131,8 @@ class BreezeTTS2LoadModel:
     CATEGORY = CATEGORY
     DESCRIPTION = "Load a Breeze TTS 2 checkpoint with dtype, device, and attention selection."
 
-    def load(self, model, dtype, device, attention, download_if_missing):
-        bundle = loader.load_breeze_bundle(model, dtype, device, attention, bool(download_if_missing))
+    def load(self, model, dtype, device, attention, decode_mode, download_if_missing):
+        bundle = loader.load_breeze_bundle(model, dtype, device, attention, bool(download_if_missing), decode_mode)
         return (bundle,)
 
 
@@ -232,6 +243,7 @@ def _generate_audio(
                 cfg_scale=float(cfg_scale),
                 params=params,
                 progress_callback=progress_callback,
+                decode_mode=bundle.decode_mode,
             )
         wav = runtime.decode_codes(bundle.codec, codes)
     finally:

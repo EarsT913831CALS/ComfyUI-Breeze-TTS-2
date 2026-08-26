@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import gc
 import importlib.util
 import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -37,6 +41,7 @@ REPO_CHOICES: dict[str, tuple[str, str]] = {
 DTYPE_OPTIONS = ["auto", "bf16", "fp32"]
 DEVICE_OPTIONS = ["auto", "cuda", "cpu"]
 ATTENTION_OPTIONS = ["auto", "eager", "sdpa", "flash_attention", "sageattention"]
+DECODE_MODE_OPTIONS = ["eager", "cuda_graphs"]
 
 SMALL_FILE_PATTERNS = [
     "config.json",
@@ -383,6 +388,7 @@ class BreezeBundle:
     device: torch.device
     dtype_name: str
     attention: str
+    decode_mode: str = "eager"
     quantized: bool = False
     patchers: list = field(default_factory=list)
 
@@ -429,15 +435,19 @@ def load_breeze_bundle(
     device_name: str,
     attention_choice: str,
     download_if_missing: bool,
+    decode_mode: str = "eager",
 ) -> BreezeBundle:
     global _ACTIVE_BUNDLE, _ACTIVE_LOAD_KEY
+
+    if decode_mode not in DECODE_MODE_OPTIONS:
+        raise ValueError(f"Unknown decode_mode: {decode_mode!r} (expected one of {DECODE_MODE_OPTIONS}).")
 
     model_dir, weights_name = resolve_model_dir(repo_choice, download_if_missing)
     wfile = weights_path(model_dir, weights_name)
     device = resolve_device(device_name)
     dtype_mode = resolve_dtype_mode(dtype_name, device)
     attn_impl = resolve_attention(attention_choice, device, dtype_mode)
-    load_key = (str(model_dir), weights_name, wfile.stat().st_mtime_ns, str(device), dtype_mode, attention_choice)
+    load_key = (str(model_dir), weights_name, wfile.stat().st_mtime_ns, str(device), dtype_mode, attention_choice, decode_mode)
 
     if _ACTIVE_BUNDLE is not None and _ACTIVE_LOAD_KEY == load_key:
         resume_bundle_to_device(_ACTIVE_BUNDLE)
@@ -480,12 +490,16 @@ def load_breeze_bundle(
         device=device,
         dtype_name=dtype_mode,
         attention=attention_choice,
+        decode_mode=decode_mode,
         quantized=bool(quant_map),
     )
 
     patchers = []
     try:
-        patcher = register_runtime_module(model, device)
+        # cuda_graphs captures weight addresses at compile time, so the model
+        # must stay resident: register it non-dynamic (AIMDO paging off). The
+        # codec is never compiled and pages normally.
+        patcher = register_runtime_module(model, device, dynamic=False if decode_mode == "cuda_graphs" else None)
         if patcher is not None:
             patchers.append(patcher)
         patcher = register_runtime_module(codec, device)
@@ -512,11 +526,74 @@ def resume_bundle_to_device(bundle: BreezeBundle) -> None:
     _register_many_with_comfy(bundle.patchers)
 
 
+_POOL_WARN_LINES = (
+    b"uncaptured free of a captured allocation",
+    b"This is technically allowed, but may indicate you are losing",
+)
+
+
+@contextlib.contextmanager
+def _silence_captured_pool_warnings():
+    """Park fd 2 while CUDA-graph pools are released and re-emit everything else.
+
+    Under the cudaMallocAsync backend the allocator prints two-line C++
+    warnings to stderr for every graph-pool tensor freed outside capture.
+    No log level or Python filter reaches them, so stderr is parked in a
+    temp file for the release and replayed minus those two lines; output
+    from other threads is preserved.
+    """
+    try:
+        saved = os.dup(2)
+    except OSError:
+        yield
+        return
+    with tempfile.TemporaryFile() as park:
+        os.dup2(park.fileno(), 2)
+        try:
+            yield
+        finally:
+            os.dup2(saved, 2)
+            os.close(saved)
+            park.seek(0)
+            for line in park.read().splitlines(keepends=True):
+                if any(marker in line for marker in _POOL_WARN_LINES):
+                    continue
+                os.write(2, line)
+
+
+def release_depth_graphs(model: nn.Module | None) -> None:
+    """Drop captured CUDA graphs and their pool tensors without warning spam."""
+    runners = getattr(model, "_breeze_depth_runners", None) or {}
+    if not any(r._graph_prefill is not None for r in runners.values()):
+        model._breeze_depth_runners = runners
+        return
+    with _silence_captured_pool_warnings():
+        for runner in runners.values():
+            runner._graph_prefill = None
+            runner._graph_steps = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+    model._breeze_depth_runners = runners
+
+
+def _release_active_graphs_at_exit() -> None:
+    if _ACTIVE_BUNDLE is not None and _ACTIVE_BUNDLE.model is not None:
+        try:
+            release_depth_graphs(_ACTIVE_BUNDLE.model)
+        except Exception:
+            pass
+
+
+atexit.register(_release_active_graphs_at_exit)
+
+
 def unload_breeze_bundle(bundle: BreezeBundle | None, reason: str = "unload", hard: bool = True) -> None:
     global _ACTIVE_BUNDLE, _ACTIVE_LOAD_KEY
     if bundle is None:
         return
     logger.info("Unloading Breeze TTS 2 bundle (%s).", reason)
+    release_depth_graphs(bundle.model)
     for patcher in bundle.patchers:
         try:
             _unregister_from_comfy(patcher)

@@ -42,8 +42,9 @@ from transformers.utils.deprecation import deprecate_kwarg
 from safetensors import safe_open
 
 # transformers >=5 ships a native T5Gemma2 encoder; older versions fall back to
-# the vendored upstream compat implementation, which also supports flash
-# attention 2 (the native one does not).
+# the vendored upstream compat implementation. The native one is flagged
+# _supports_flash_attn=False, but register_te_flash_attention() below wires it
+# into transformers' FA2 path under a custom name.
 try:
     from transformers.models.t5gemma2.modeling_t5gemma2 import (
         T5Gemma2RotaryEmbedding,
@@ -70,6 +71,68 @@ _CAUSAL_MASK_EMBED_KEY = (
     if "inputs_embeds" in inspect.signature(create_causal_mask).parameters
     else "input_embeds"
 )
+
+
+# Deliberately avoids the substring "flash_attention_2": transformers
+# substring-matches it in get_correct_attn_implementation and would run the
+# _supports_flash_attn gate that blocks T5Gemma2.
+_TE_FA2_NAME = "breeze_te_fa2"
+
+
+def register_te_flash_attention() -> None:
+    """Register FA2 for the native T5Gemma2 encoder under a custom name.
+
+    transformers blocks flash-attention on T5Gemma2 with
+    ``_supports_flash_attn = False`` (a softcapping concern), but this
+    checkpoint has ``attn_logit_softcapping = None`` and flash-attn handles
+    its sliding-window / GQA / bidirectional layers natively. Dispatch goes
+    through ``ALL_ATTENTION_FUNCTIONS.get_interface``, which never consults
+    that flag, so a registered alias is enough. The matching mask factory
+    hands FA2 the 2D padding mask it unpads internally.
+    """
+    from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS, flash_attention_mask
+    from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
+
+    if _TE_FA2_NAME in ALL_ATTENTION_FUNCTIONS.keys():
+        return
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
+
+    def breeze_te_fa2_forward(module, query, key, value, attention_mask, dropout=0.0, scaling=None, sliding_window=None, **kwargs):
+        # The T5Gemma2 encoder is bidirectional: causal stays off and the
+        # sliding window is symmetric. transformers' own FA2 wrapper corrupts
+        # right-padded batches for this model, so pad/unpad by hand.
+        q = query.transpose(1, 2)  # [B, S, H, D]
+        k = key.transpose(1, 2)
+        v = value.transpose(1, 2)
+        bsz, seqlen, heads, head_dim = q.shape
+        window = (-1, -1)
+        if sliding_window is not None and seqlen > sliding_window:
+            window = (sliding_window - 1, sliding_window - 1)
+        if attention_mask is None:
+            out = flash_attn_func(q, k, v, dropout_p=dropout, softmax_scale=scaling, causal=False, window_size=window)
+            return out, None
+        mask = attention_mask.reshape(bsz, seqlen).bool()
+        lengths = mask.sum(dim=1, dtype=torch.int32)
+        cu_seqlens = torch.zeros(bsz + 1, dtype=torch.int32, device=q.device)
+        cu_seqlens[1:] = lengths.cumsum(0)
+        idx = mask.reshape(-1).nonzero(as_tuple=True)[0]
+        max_len = int(lengths.max())
+        out = q.new_zeros(bsz * seqlen, heads, head_dim)
+        out[idx] = flash_attn_varlen_func(
+            q.reshape(bsz * seqlen, heads, head_dim)[idx],
+            k.reshape(bsz * seqlen, *k.shape[2:])[idx],
+            v.reshape(bsz * seqlen, *v.shape[2:])[idx],
+            cu_seqlens, cu_seqlens,
+            max_len, max_len,
+            dropout_p=dropout,
+            softmax_scale=scaling,
+            causal=False,
+            window_size=window,
+        )
+        return out.view(bsz, seqlen, heads, head_dim), None
+
+    ALL_ATTENTION_FUNCTIONS.register(_TE_FA2_NAME, breeze_te_fa2_forward)
+    ALL_MASK_ATTENTION_FUNCTIONS.register(_TE_FA2_NAME, flash_attention_mask)
 
 try:
     import comfy.ops as _comfy_ops
@@ -1030,9 +1093,10 @@ def build_breeze_model(config_dict: dict[str, Any], attn_implementation: str) ->
         # 4.x warns about FA2 without a declared dtype; weights are cast at load anyway
         te_config.torch_dtype = torch.bfloat16
     if _TE_NATIVE and attn_implementation == "flash_attention_2":
-        # The native T5Gemma2 encoder has no flash-attention-2 implementation
-        # (_supports_flash_attn=False); the vendored compat one does.
-        te_config._attn_implementation = "sdpa"
+        # transformers flags the native T5Gemma2 encoder as no-FA2; the custom
+        # registration above routes it through transformers' own FA2 path.
+        register_te_flash_attention()
+        te_config._attn_implementation = _TE_FA2_NAME
     else:
         te_config._attn_implementation = attn_implementation
     config._attn_implementation = attn_implementation
