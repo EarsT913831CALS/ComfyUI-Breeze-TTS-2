@@ -1,5 +1,7 @@
 # ComfyUI-Breeze-TTS-2
 
+**English** | [简体中文](README_CN.md)
+
 [Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) nodes for ComfyUI: **voice clone**,
 **voice design**, and **voice direction** with bilingual (EN/ZH) speech, inline vocal events,
 INT8 ConvRot quantized builds, and full ComfyUI / AIMDO dynamic-VRAM integration.
@@ -8,10 +10,10 @@ INT8 ConvRot quantized builds, and full ComfyUI / AIMDO dynamic-VRAM integration
 
 | Node | Purpose |
 | --- | --- |
-| **Breeze TTS 2 Load Model** | Loads the checkpoint with `dtype` (auto/bf16/fp32), `device` (auto/cuda/cpu), `attention` (auto/sdpa/flash_attention/sageattention), and `download_if_missing`. |
+| **Breeze TTS 2 Load Model** | Loads the checkpoint with `dtype` (auto/bf16/fp32), `device` (auto/cuda/cpu), `attention` (auto/eager/sdpa/flash_attention/sageattention), and `download_if_missing`. |
 | **Breeze TTS 2 Voice Clone** | Clones a speaker from clean reference audio + its exact transcript (CFG 1.0). |
 | **Breeze TTS 2 Voice Design** | Creates a voice from a natural-language description, no reference audio (CFG 4). |
-| **Breeze TTS 2 Voice Direction** | Clones a reference voice and steers tone, emotion, pace, and delivery with an instruction (CFG 4). |
+| **Breeze TTS 2 Voice Direction** | Clones a reference voice and steers tone, emotion, pace, and delivery with an instruction (CFG 4). `stitch_reference` can play the original reference clip before or after the generated speech in the output. |
 | **Breeze TTS 2 Whisper Transcribe** | Whisper helper that produces the exact transcript cloning needs. |
 
 Vocal events work inline in the text: `(laugh)`, `(cough)`, `(clears throat)`, `(sigh)` in English;
@@ -61,8 +63,8 @@ Only the selected weights file is downloaded; every build shares the same `confi
 | Component | bf16 build | int8 builds |
 | --- | --- | --- |
 | Model weights | 6.49 GiB | 4.22–5.84 GiB |
-| `audio_tokenizer` codec | 0.64 GiB | unchanged | unchanged |
-| Tokenizer + configs | ~35 MB | unchanged | unchanged |
+| `audio_tokenizer` codec | 0.64 GiB | unchanged |
+| Tokenizer + configs | ~35 MB | unchanged |
 
 Expect roughly **5.3–7.5 GiB VRAM** depending on build and dtype; AIMDO DynamicVRAM pages castable weights to keep live VRAM pressure low alongside other models.
 

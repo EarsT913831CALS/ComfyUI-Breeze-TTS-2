@@ -246,6 +246,23 @@ def _generate_audio(
     return runtime.tensor_audio_to_comfy(wav)
 
 
+def _stitch_reference(audio: dict, ref_audio: dict, mode: str) -> dict:
+    if mode == "none":
+        return audio
+    ref_wav, ref_sr = runtime.comfy_audio_to_tensor(ref_audio)
+    if ref_wav.numel() == 0:
+        return audio
+    sample_rate = int(audio["sample_rate"])
+    if ref_sr != sample_rate:
+        import torchaudio.functional as AF
+
+        ref_wav = AF.resample(ref_wav, ref_sr, sample_rate)
+    generated = audio["waveform"].view(-1)
+    parts = (ref_wav, generated) if mode == "before" else (generated, ref_wav)
+    stitched = torch.cat(parts).clamp(-1.0, 1.0)
+    return {"waveform": stitched.view(1, 1, -1).contiguous(), "sample_rate": sample_rate}
+
+
 class BreezeTTS2VoiceClone:
     @classmethod
     def INPUT_TYPES(cls):
@@ -340,6 +357,17 @@ class BreezeTTS2VoiceDirection:
                 "Direction for tone, emotion, pace, and delivery applied on top of the cloned voice.",
             ),
             "cfg_scale": _cfg_input(4.0, "Guidance scale. 4 is recommended for instruction-following."),
+            "stitch_reference": (
+                ["none", "before", "after"],
+                {
+                    "default": "none",
+                    "tooltip": (
+                        "Stitch the original reference clip into the output audio: "
+                        "'none' returns the generated speech only, 'before' plays the reference clip first, "
+                        "'after' appends it at the end. Purely an output edit; generation is unchanged."
+                    ),
+                },
+            ),
         }
         required.update(_generation_controls())
         return {"required": required}
@@ -350,7 +378,7 @@ class BreezeTTS2VoiceDirection:
     CATEGORY = CATEGORY
     DESCRIPTION = "Clone a voice from reference audio while steering tone, emotion, pace, and delivery."
 
-    def direct(self, breeze_model, text, reference_audio, reference_text, instruction, cfg_scale, **controls):
+    def direct(self, breeze_model, text, reference_audio, reference_text, instruction, cfg_scale, stitch_reference="none", **controls):
         audio = _generate_audio(
             breeze_model,
             text=text,
@@ -360,7 +388,7 @@ class BreezeTTS2VoiceDirection:
             cfg_scale=cfg_scale,
             **controls,
         )
-        return (audio,)
+        return (_stitch_reference(audio, reference_audio, stitch_reference),)
 
 
 NODE_CLASS_MAPPINGS = {
