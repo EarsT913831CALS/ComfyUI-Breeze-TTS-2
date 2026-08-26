@@ -1036,7 +1036,10 @@ def build_breeze_model(config_dict: dict[str, Any], attn_implementation: str) ->
     else:
         te_config._attn_implementation = attn_implementation
     config._attn_implementation = attn_implementation
-    config.depth_decoder_config._attn_implementation = attn_implementation
+    # The depth decoder attends with custom per-position masks over a static
+    # cache; transformers' FA2 varlen path cannot consume those. It runs M<=2
+    # steps where the backend is irrelevant, so it always uses sdpa.
+    config.depth_decoder_config._attn_implementation = "sdpa"
     config.text_encoder_config = te_config
 
     import accelerate

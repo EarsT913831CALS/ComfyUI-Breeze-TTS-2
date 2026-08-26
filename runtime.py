@@ -329,13 +329,16 @@ class _DepthRunner:
         self._cos, self._sin = cos[0], sin[0]
         self.cache = _new_static_cache(depth.config, length, batch, device, dtype)
         min_val = torch.finfo(dtype).min
-        prefill_mask = torch.full((1, 1, 2, length), min_val, device=device, dtype=dtype)
-        prefill_mask[0, 0, 0, 0] = 0.0
-        prefill_mask[0, 0, 1, :2] = 0.0
+        # Masks must carry the true batch size: flash-attention's varlen path
+        # derives cu_seqlens from the mask shape, so a broadcast batch-1 mask
+        # aborts the kernel under CFG (batch=2).
+        prefill_mask = torch.full((batch, 1, 2, length), min_val, device=device, dtype=dtype)
+        prefill_mask[:, 0, 0, 0] = 0.0
+        prefill_mask[:, 0, 1, :2] = 0.0
         self._prefill_mask = prefill_mask
         decode_masks = []
         for t in range(2, length):
-            mask = torch.full((1, 1, 1, length), min_val, device=device, dtype=dtype)
+            mask = torch.full((batch, 1, 1, length), min_val, device=device, dtype=dtype)
             mask[..., : t + 1] = 0.0
             decode_masks.append(mask)
         self._decode_masks = decode_masks
