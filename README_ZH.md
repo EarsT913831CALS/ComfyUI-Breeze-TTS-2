@@ -2,6 +2,8 @@
 
 [English](README.md) | **简体中文**
 
+<img width="1483" height="1170" alt="Screenshot 2026-08-26 160830" src="https://github.com/user-attachments/assets/95f2f346-472e-45a5-bd3e-625007c6cc39" />
+
 适用于 ComfyUI 的 [Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) 节点：**语音克隆**、
 **声音设计** 与 **声音风格指令**，支持中英双语语音、内联语气事件、
 INT8 ConvRot 量化构建，并完整集成 ComfyUI / AIMDO 动态显存管理。
