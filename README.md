@@ -1,6 +1,6 @@
 # ComfyUI-Breeze-TTS-2
 
-**English** | [简体中文](README_CN.md)
+**English** | [简体中文](README_ZH.md)
 
 [Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) nodes for ComfyUI: **voice clone**,
 **voice design**, and **voice direction** with bilingual (EN/ZH) speech, inline vocal events,
