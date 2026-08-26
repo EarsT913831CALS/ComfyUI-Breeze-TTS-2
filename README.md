@@ -5,6 +5,12 @@
 <img width="1483" height="1170" alt="Screenshot 2026-08-26 160830" src="https://github.com/user-attachments/assets/95f2f346-472e-45a5-bd3e-625007c6cc39" />
 
 
+
+https://github.com/user-attachments/assets/d4226032-3337-450b-83c6-ab9c732172d6
+
+
+
+
 [Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) nodes for ComfyUI: **voice clone**,
 **voice design**, and **voice direction** with bilingual (EN/ZH) speech, inline vocal events,
 INT8 ConvRot quantized builds, and full ComfyUI / AIMDO dynamic-VRAM integration.
