@@ -1,102 +1,124 @@
 {
   "id": "breeze-tts-2-voice-clone",
   "revision": 0,
-  "last_node_id": 7,
-  "last_link_id": 5,
+  "last_node_id": 16,
+  "last_link_id": 16,
   "nodes": [
     {
-      "id": 1,
+      "id": 2,
       "type": "MarkdownNote",
       "pos": [
-        12,
-        -109
+        19.73393390074371,
+        415.8054562400394
       ],
       "size": [
-        390,
-        300
+        371.6620149385029,
+        588.3811471793289
       ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [],
-      "properties": {},
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
       "widgets_values": [
-        "## Breeze TTS 2\n\n[Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) is BreezeBlue's open-weight real-time TTS model: it ranks #1 among open-weight models on the Artificial Analysis TTS leaderboard and speaks natural **English and Chinese** from a single checkpoint.\n\n## ComfyUI links\n- [saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/saganaki22/ComfyUI-Breeze-TTS-2)\n- [drbaph/Breeze-TTS-2-comfyui](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui) (bf16 + int8 builds; the loader auto-downloads)\n\n## About this workflow\n\nVoice cloning: **Load Model** -> **Whisper Transcribe** (builds the reference transcript) -> **Voice Clone**.\n\n**Key inputs**\n\n- **model**: `int8-hybrid` (default - bf16 speed at ~5.5 GiB peak VRAM), `bf16` (fastest, ~7.5 GiB), `int8-convrot` (smallest, ~5.2 GiB, slower decode), `int8-text-encoder` (decode path bf16)\n- **dtype / attention**: auto picks bf16 + flash_attention (falls back to sdpa); sageattention is supported\n- **reference_audio / reference_text**: a clean clip and its exact transcript (the Whisper node transcribes for you)\n- **text**: vocal events work inline - `(laugh)`, `(sigh)`, `(cough)`, `(clears throat)` in English, `[\u7b11]`, `[\u53f9\u6c14]` in Chinese\n- **cfg_scale**: 1.0 clones the reference as-is; the Design/Direction nodes default to 4 for instruction-following\n- **seed**: repeatable when positive, 0 keeps the current random state\n\nTry the **Voice Design** node for reference-free synthesis and **Voice Direction** to steer a cloned voice with an instruction. Output is 24 kHz mono."
-      ]
+        "## Model files\nThe loader downloads into `ComfyUI/models/breezetts2/drbaph_Breeze-TTS-2-comfyui/` when `download_if_missing` is on; only the selected weights file plus the shared configs and `audio_tokenizer/` codec are fetched.\n\n- [Breeze-TTS-2-bf16.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-bf16.safetensors) - bf16, official shards merged bit-exact (6.49 GiB)\n- [Breeze-TTS-2-int8-hybrid.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-hybrid.safetensors) - recommended int8 build (4.53 GiB, bf16-level speed)\n- [Breeze-TTS-2-int8-convrot.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-convrot.safetensors) - all 462 linears quantized (4.22 GiB)\n- [Breeze-TTS-2-int8-text-encoder.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-text-encoder.safetensors) - decode path bf16 (5.84 GiB)\n- `audio_tokenizer/` - Qwen3-TTS 12 Hz codec, shared by every build\n\n```\n📂 ComfyUI/\n└── 📂 models/\n    └── 📂 breezetts2/\n        └── 📂 drbaph_Breeze-TTS-2-comfyui/\n            ├── Breeze-TTS-2-bf16.safetensors              (6.49 GiB, official shards merged bit-exact)\n            ├── Breeze-TTS-2-int8-hybrid.safetensors       (4.53 GiB, recommended int8 build)\n            ├── Breeze-TTS-2-int8-convrot.safetensors      (4.22 GiB, all 462 linears quantized)\n            ├── Breeze-TTS-2-int8-text-encoder.safetensors (5.84 GiB, decode path bf16)\n            ├── config.json\n            ├── generation_config.json\n            ├── tokenizer.json\n            ├── tokenizer_config.json\n            ├── special_tokens_map.json\n            └── 📂 audio_tokenizer/                        (Qwen3-TTS 12 Hz codec, shared)\n                ├── model.safetensors                      (0.64 GiB)\n                ├── config.json\n                ├── configuration.json\n                └── preprocessor_config.json\n```\n\n\nWeights are research / non-commercial use only [BreezeBlue license](https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE)"
+      ],
+      "widgets_values_named": {
+        "text": "## Model files\nThe loader downloads into `ComfyUI/models/breezetts2/drbaph_Breeze-TTS-2-comfyui/` when `download_if_missing` is on; only the selected weights file plus the shared configs and `audio_tokenizer/` codec are fetched.\n\n- [Breeze-TTS-2-bf16.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-bf16.safetensors) - bf16, official shards merged bit-exact (6.49 GiB)\n- [Breeze-TTS-2-int8-hybrid.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-hybrid.safetensors) - recommended int8 build (4.53 GiB, bf16-level speed)\n- [Breeze-TTS-2-int8-convrot.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-convrot.safetensors) - all 462 linears quantized (4.22 GiB)\n- [Breeze-TTS-2-int8-text-encoder.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-text-encoder.safetensors) - decode path bf16 (5.84 GiB)\n- `audio_tokenizer/` - Qwen3-TTS 12 Hz codec, shared by every build\n\n```\n📂 ComfyUI/\n└── 📂 models/\n    └── 📂 breezetts2/\n        └── 📂 drbaph_Breeze-TTS-2-comfyui/\n            ├── Breeze-TTS-2-bf16.safetensors              (6.49 GiB, official shards merged bit-exact)\n            ├── Breeze-TTS-2-int8-hybrid.safetensors       (4.53 GiB, recommended int8 build)\n            ├── Breeze-TTS-2-int8-convrot.safetensors      (4.22 GiB, all 462 linears quantized)\n            ├── Breeze-TTS-2-int8-text-encoder.safetensors (5.84 GiB, decode path bf16)\n            ├── config.json\n            ├── generation_config.json\n            ├── tokenizer.json\n            ├── tokenizer_config.json\n            ├── special_tokens_map.json\n            └── 📂 audio_tokenizer/                        (Qwen3-TTS 12 Hz codec, shared)\n                ├── model.safetensors                      (0.64 GiB)\n                ├── config.json\n                ├── configuration.json\n                └── preprocessor_config.json\n```\n\n\nWeights are research / non-commercial use only [BreezeBlue license](https://huggingface.co/BreezeBlue/Breeze-TTS-2/blob/main/LICENSE)"
+      },
+      "color": "#222",
+      "bgcolor": "#000"
     },
     {
-      "id": 2,
-      "type": "MarkdownNote",
+      "id": 7,
+      "type": "BreezeWhisperTranscribe",
       "pos": [
-        12,
-        230
-      ],
-      "size": [
-        390,
-        240
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "properties": {},
-      "widgets_values": [
-        "## Model files\nThe loader downloads into `ComfyUI/models/breezetts2/drbaph_Breeze-TTS-2-comfyui/` when `download_if_missing` is on; only the selected weights file plus the shared configs and `audio_tokenizer/` codec are fetched.\n\n- [Breeze-TTS-2-bf16.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-bf16.safetensors) - bf16, official shards merged bit-exact (6.49 GiB)\n- [Breeze-TTS-2-int8-hybrid.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-hybrid.safetensors) - recommended int8 build (4.53 GiB, bf16-level speed)\n- [Breeze-TTS-2-int8-convrot.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-convrot.safetensors) - all 462 linears quantized (4.22 GiB)\n- [Breeze-TTS-2-int8-text-encoder.safetensors](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui/resolve/main/Breeze-TTS-2-int8-text-encoder.safetensors) - decode path bf16 (5.84 GiB)\n- `audio_tokenizer/` - Qwen3-TTS 12 Hz codec, shared by every build\n\nWeights are research / non-commercial use only (BreezeBlue license)."
-      ]
-    },
-    {
-      "id": 3,
-      "type": "BreezeTTS2LoadModel",
-      "pos": [
-        440,
-        12
+        438.8048196971449,
+        601.8369875827631
       ],
       "size": [
         350,
-        190
+        220
       ],
       "flags": {},
-      "order": 2,
+      "order": 5,
       "mode": 0,
-      "inputs": [],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 3
+        }
+      ],
       "outputs": [
         {
-          "name": "breeze_model",
-          "type": "BREEZE_TTS2_MODEL",
+          "name": "audio",
+          "type": "AUDIO",
+          "slot_index": 0,
           "links": [
-            1
-          ],
-          "slot_index": 0
+            4,
+            14
+          ]
+        },
+        {
+          "name": "transcript",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            6,
+            15
+          ]
         }
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
         "ver": "1.2.0",
-        "Node name for S&R": "BreezeTTS2LoadModel"
+        "Node name for S&R": "BreezeWhisperTranscribe",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
       },
       "widgets_values": [
-        "int8 hybrid (recommended)",
+        "whisper-large-v3-turbo",
         "auto",
         "auto",
-        "auto",
-        true
-      ]
+        "transcribe",
+        30,
+        false
+      ],
+      "widgets_values_named": {
+        "model": "whisper-large-v3-turbo",
+        "dtype": "auto",
+        "language": "auto",
+        "task": "transcribe",
+        "chunk_length_s": 30,
+        "download_if_missing": false
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
       "id": 4,
       "type": "BreezeTTS2VoiceClone",
       "pos": [
-        830,
-        12
+        871.5662969550017,
+        -176.60349273090097
       ],
       "size": [
         440,
         500
       ],
       "flags": {},
-      "order": 5,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
@@ -115,7 +137,83 @@
           "widget": {
             "name": "reference_text"
           },
-          "link": 5
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "slot_index": 0,
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-breeze-tts-2",
+        "ver": "1.2.0",
+        "Node name for S&R": "BreezeTTS2VoiceClone",
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "reference_text": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "(sigh) It is good to hear your voice again after all this time.",
+        "",
+        1,
+        1500,
+        0.9,
+        50,
+        1,
+        1.1,
+        0.9,
+        50,
+        1,
+        1422600623,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "text": "(sigh) It is good to hear your voice again after all this time.",
+        "reference_text": "",
+        "cfg_scale": 1,
+        "max_new_tokens": 1500,
+        "temperature": 0.9,
+        "top_k": 50,
+        "top_p": 1,
+        "repetition_penalty": 1.1,
+        "depth_temperature": 0.9,
+        "depth_top_k": 50,
+        "depth_top_p": 1,
+        "seed": 1422600623,
+        "control_after_generate": "randomize"
+      },
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 8,
+      "type": "BreezeTTS2VoiceDesign",
+      "pos": [
+        1370.9730764323413,
+        245.97013835471404
+      ],
+      "size": [
+        400,
+        406
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "breeze_model",
+          "type": "BREEZE_TTS2_MODEL",
+          "link": 7
         }
       ],
       "outputs": [
@@ -123,44 +221,184 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            2
-          ],
-          "slot_index": 0
+            8
+          ]
         }
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
         "ver": "1.2.0",
-        "Node name for S&R": "BreezeTTS2VoiceClone"
+        "Node name for S&R": "BreezeTTS2VoiceDesign",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
       },
       "widgets_values": [
-        "(sigh) It is good to hear your voice again after all this time.",
-        "",
-        1.0,
+        "(sigh) Welcome aboard. Your journey begins now.",
+        "A warm, thoughtful young woman with a clear voice and a calm, reflective delivery.",
+        4,
         1500,
         0.9,
         50,
-        1.0,
+        1,
         1.1,
         0.9,
         50,
-        1.0,
-        42
-      ]
+        1,
+        1676994235,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "text": "(sigh) Welcome aboard. Your journey begins now.",
+        "instruction": "A warm, thoughtful young woman with a clear voice and a calm, reflective delivery.",
+        "cfg_scale": 4,
+        "max_new_tokens": 1500,
+        "temperature": 0.9,
+        "top_k": 50,
+        "top_p": 1,
+        "repetition_penalty": 1.1,
+        "depth_temperature": 0.9,
+        "depth_top_k": 50,
+        "depth_top_p": 1,
+        "seed": 1676994235,
+        "control_after_generate": "randomize"
+      },
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        19.414382594004135,
+        -157.90097797304122
+      ],
+      "size": [
+        373.39671454390043,
+        521.6562364086933
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "## Breeze TTS 2\n\n[Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) is BreezeBlue's open-weight real-time TTS model: it ranks #1 among open-weight models on the Artificial Analysis TTS leaderboard and speaks natural **English and Chinese** from a single checkpoint.\n\n## ComfyUI links\n- [saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/saganaki22/ComfyUI-Breeze-TTS-2)\n- [drbaph/Breeze-TTS-2-comfyui](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui) (bf16 + int8 builds; the loader auto-downloads)\n\n## About this workflow\n\nVoice cloning: **Load Model** -> **Whisper Transcribe** (builds the reference transcript) -> **Voice Clone**.\n\n**Key inputs**\n\n- **model**: `int8-hybrid` (default - bf16 speed at ~5.5 GiB peak VRAM), `bf16` (fastest, ~7.5 GiB), `int8-convrot` (smallest, ~5.2 GiB, slower decode), `int8-text-encoder` (decode path bf16)\n- **dtype / attention**: auto picks bf16 + flash_attention (falls back to sdpa); sageattention is supported\n- **reference_audio / reference_text**: a clean clip and its exact transcript (the Whisper node transcribes for you)\n- **text**: vocal events work inline - `(laugh)`, `(sigh)`, `(cough)`, `(clears throat)` in English, `[笑]`, `[叹气]` in Chinese\n- **cfg_scale**: 1.0 clones the reference as-is; the Design/Direction nodes default to 4 for instruction-following\n- **seed**: repeatable when positive, 0 keeps the current random state\n\nTry the **Voice Design** node for reference-free synthesis and **Voice Direction** to steer a cloned voice with an instruction. Output is 24 kHz mono.\n\n[Saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/Saganaki22/ComfyUI-Breeze-TTS-2)"
+      ],
+      "widgets_values_named": {
+        "text": "## Breeze TTS 2\n\n[Breeze TTS 2](https://huggingface.co/BreezeBlue/Breeze-TTS-2) is BreezeBlue's open-weight real-time TTS model: it ranks #1 among open-weight models on the Artificial Analysis TTS leaderboard and speaks natural **English and Chinese** from a single checkpoint.\n\n## ComfyUI links\n- [saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/saganaki22/ComfyUI-Breeze-TTS-2)\n- [drbaph/Breeze-TTS-2-comfyui](https://huggingface.co/drbaph/Breeze-TTS-2-comfyui) (bf16 + int8 builds; the loader auto-downloads)\n\n## About this workflow\n\nVoice cloning: **Load Model** -> **Whisper Transcribe** (builds the reference transcript) -> **Voice Clone**.\n\n**Key inputs**\n\n- **model**: `int8-hybrid` (default - bf16 speed at ~5.5 GiB peak VRAM), `bf16` (fastest, ~7.5 GiB), `int8-convrot` (smallest, ~5.2 GiB, slower decode), `int8-text-encoder` (decode path bf16)\n- **dtype / attention**: auto picks bf16 + flash_attention (falls back to sdpa); sageattention is supported\n- **reference_audio / reference_text**: a clean clip and its exact transcript (the Whisper node transcribes for you)\n- **text**: vocal events work inline - `(laugh)`, `(sigh)`, `(cough)`, `(clears throat)` in English, `[笑]`, `[叹气]` in Chinese\n- **cfg_scale**: 1.0 clones the reference as-is; the Design/Direction nodes default to 4 for instruction-following\n- **seed**: repeatable when positive, 0 keeps the current random state\n\nTry the **Voice Design** node for reference-free synthesis and **Voice Direction** to steer a cloned voice with an instruction. Output is 24 kHz mono.\n\n[Saganaki22/ComfyUI-Breeze-TTS-2](https://github.com/Saganaki22/ComfyUI-Breeze-TTS-2)"
+      },
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 9,
+      "type": "PreviewAudio",
+      "pos": [
+        1362.4010244040244,
+        710.2395713519085
+      ],
+      "size": [
+        410.1914268405485,
+        100
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "PreviewAudio",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {},
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 11,
+      "type": "PreviewAudio",
+      "pos": [
+        891.0724792000218,
+        1105.7875620547347
+      ],
+      "size": [
+        402.9346453706189,
+        98.9633169328672
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "PreviewAudio",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [],
+      "widgets_values_named": {},
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
     },
     {
       "id": 5,
       "type": "PreviewAudio",
       "pos": [
-        1320,
-        12
+        874.5126804865799,
+        375.96251233271914
       ],
       "size": [
-        320,
-        100
+        441.2919188545304,
+        90.66985239580538
       ],
       "flags": {},
-      "order": 6,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -169,68 +407,110 @@
           "link": 2
         }
       ],
-      "outputs": [],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
       "properties": {
-        "Node name for S&R": "PreviewAudio"
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
+        "Node name for S&R": "PreviewAudio",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
       },
-      "widgets_values": []
+      "widgets_values": [],
+      "widgets_values_named": {},
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
     },
     {
       "id": 6,
       "type": "LoadAudio",
       "pos": [
-        440,
-        260
+        434.3187080801228,
+        399.29580207809204
       ],
       "size": [
         350,
-        130
+        136
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [],
       "outputs": [
         {
           "name": "AUDIO",
           "type": "AUDIO",
+          "slot_index": 0,
           "links": [
             3
-          ],
-          "slot_index": 0
+          ]
         }
       ],
       "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.34.0",
         "Node name for S&R": "LoadAudio",
         "widgets": {
           "upload": "audio"
+        },
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
         }
       },
       "widgets_values": [
-        "reference.wav",
+        "stewie.wav",
         null,
         null
-      ]
+      ],
+      "widgets_values_named": {
+        "audio": "stewie.wav",
+        "upload": null
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     },
     {
-      "id": 7,
-      "type": "BreezeWhisperTranscribe",
+      "id": 16,
+      "type": "BreezeTTS2VoiceDirection",
       "pos": [
-        440,
-        430
+        893.9861382691608,
+        553.62605368784
       ],
       "size": [
-        350,
-        220
+        400,
+        504
       ],
       "flags": {},
-      "order": 4,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
-          "name": "audio",
+          "name": "breeze_model",
+          "type": "BREEZE_TTS2_MODEL",
+          "link": 13
+        },
+        {
+          "name": "reference_audio",
           "type": "AUDIO",
-          "link": 3
+          "link": 14
+        },
+        {
+          "name": "reference_text",
+          "type": "STRING",
+          "widget": {
+            "name": "reference_text"
+          },
+          "link": 15
         }
       ],
       "outputs": [
@@ -238,32 +518,146 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            4
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "transcript",
-          "type": "STRING",
-          "links": [
-            5
-          ],
-          "slot_index": 1
+            16
+          ]
         }
       ],
       "properties": {
         "cnr_id": "comfyui-breeze-tts-2",
         "ver": "1.2.0",
-        "Node name for S&R": "BreezeWhisperTranscribe"
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "Node name for S&R": "BreezeTTS2VoiceDirection"
       },
       "widgets_values": [
-        "whisper-large-v3-turbo",
+        "(clears throat) We need to discuss what happened last night.",
+        "This is the exact transcript of the reference audio.",
+        "Speak slowly with a restrained, serious tone.",
+        4,
+        "none",
+        1500,
+        0.9,
+        50,
+        1,
+        1.1,
+        0.9,
+        50,
+        1,
+        1992631821,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "text": "(clears throat) We need to discuss what happened last night.",
+        "reference_text": "This is the exact transcript of the reference audio.",
+        "instruction": "Speak slowly with a restrained, serious tone.",
+        "cfg_scale": 4,
+        "stitch_reference": "none",
+        "max_new_tokens": 1500,
+        "temperature": 0.9,
+        "top_k": 50,
+        "top_p": 1,
+        "repetition_penalty": 1.1,
+        "depth_temperature": 0.9,
+        "depth_top_k": 50,
+        "depth_top_p": 1,
+        "seed": 1992631821,
+        "control_after_generate": "randomize"
+      },
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 14,
+      "type": "Label (rgthree)",
+      "pos": [
+        801.1445428668397,
+        -287.1471225398472
+      ],
+      "size": [
+        600.15625,
+        20
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Tags: (laugh) (cough) (clears throat) (sigh) [笑] [咳嗽] [清嗓子] [叹气]",
+      "properties": {
+        "fontSize": 20,
+        "fontFamily": "Arial",
+        "fontColor": "#ffffff",
+        "textAlign": "center",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 3,
+      "type": "BreezeTTS2LoadModel",
+      "pos": [
+        435.2719190779062,
+        102.10526765130224
+      ],
+      "size": [
+        350,
+        190
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "breeze_model",
+          "type": "BREEZE_TTS2_MODEL",
+          "slot_index": 0,
+          "links": [
+            1,
+            7,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-breeze-tts-2",
+        "ver": "1.2.0",
+        "Node name for S&R": "BreezeTTS2LoadModel",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "int8 hybrid (recommended)",
         "auto",
         "auto",
-        "transcribe",
-        30,
-        true
-      ]
+        "eager",
+        false
+      ],
+      "widgets_values_named": {
+        "model": "int8 hybrid (recommended)",
+        "dtype": "auto",
+        "device": "auto",
+        "attention": "eager",
+        "download_if_missing": false
+      },
+      "color": "#432",
+      "bgcolor": "#653"
     }
   ],
   "links": [
@@ -300,16 +694,140 @@
       "AUDIO"
     ],
     [
-      5,
+      6,
       7,
       1,
       4,
       2,
       "STRING"
+    ],
+    [
+      7,
+      3,
+      0,
+      8,
+      0,
+      "BREEZE_TTS2_MODEL"
+    ],
+    [
+      8,
+      8,
+      0,
+      9,
+      0,
+      "AUDIO"
+    ],
+    [
+      13,
+      3,
+      0,
+      16,
+      0,
+      "BREEZE_TTS2_MODEL"
+    ],
+    [
+      14,
+      7,
+      0,
+      16,
+      1,
+      "AUDIO"
+    ],
+    [
+      15,
+      7,
+      1,
+      16,
+      2,
+      "STRING"
+    ],
+    [
+      16,
+      16,
+      0,
+      11,
+      0,
+      "AUDIO"
     ]
   ],
-  "groups": [],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Model Loader",
+      "bounding": [
+        425.2719190779062,
+        32.10526765130234,
+        370,
+        270
+      ],
+      "color": "#b58b2a",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "audio ref + preprocess",
+      "bounding": [
+        424.3187080801228,
+        329.29580207809215,
+        374.4861116170221,
+        502.54118550467064
+      ],
+      "color": "#b58b2a",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "Voice Clone",
+      "bounding": [
+        861.5662969550017,
+        -246.60349273090097,
+        464.23830238610867,
+        723.2358574594255
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "Voice Design",
+      "bounding": [
+        1352.4010244040244,
+        175.97013835471387,
+        430.1914268405485,
+        644.2694329971953
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "Voice Direction",
+      "bounding": [
+        881.0724792000218,
+        503.87681232454406,
+        422.9346453706189,
+        712.128453174289
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
   "config": {},
-  "extra": {},
+  "extra": {
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "ds": {
+      "scale": 0.7247295000000019,
+      "offset": [
+        432.44103380618265,
+        585.8419459187761
+      ]
+    },
+    "frontendVersion": "1.49.6",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
   "version": 0.4
 }
