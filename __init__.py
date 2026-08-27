@@ -8,7 +8,7 @@ import logging
 import sys
 import types
 
-__version__ = "v1.3.0"
+__version__ = "v1.3.1"
 
 logger = logging.getLogger("BreezeTTS2")
 logger.propagate = False
@@ -19,15 +19,46 @@ if not logger.handlers:
 logger.setLevel(logging.INFO)
 
 
+def _no_dll_dialogs():
+    """Suppress Windows loader popups (e.g. 'Entry Point Not Found') on this thread."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+
+    k32 = ctypes.windll.kernel32
+    if not hasattr(k32, "SetThreadErrorMode"):
+        return None
+    prev = ctypes.c_uint()
+    # SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX
+    if k32.SetThreadErrorMode(0x0001 | 0x8000, ctypes.byref(prev)) == 0:
+        return None
+
+    def restore():
+        k32.SetThreadErrorMode(prev.value, None)
+
+    return restore
+
+
 def _block_broken_torchcodec() -> None:
-    """Stub out a broken torchcodec install so transformers audio imports survive."""
+    """Stub out a broken torchcodec install so transformers audio imports survive.
+
+    A torchcodec built for a different torch (its wheels pin to torch minors)
+    fails to load with a Windows 'Entry Point Not Found' dialog; probe with
+    loader popups suppressed so the user never sees it, then fall back to the
+    stub when the import fails.
+    """
+    restore_error_mode = _no_dll_dialogs()
     try:
-        torchcodec = importlib.import_module("torchcodec")
-        if torchcodec is not None and getattr(torchcodec, "__spec__", None) is not None:
-            return
-        raise ImportError("torchcodec is broken")
-    except Exception:
-        pass
+        try:
+            torchcodec = importlib.import_module("torchcodec")
+            if torchcodec is not None and getattr(torchcodec, "__spec__", None) is not None:
+                return
+            raise ImportError("torchcodec is broken")
+        except Exception:
+            pass
+    finally:
+        if restore_error_mode is not None:
+            restore_error_mode()
 
     stub = types.ModuleType("torchcodec")
     stub.__spec__ = importlib.machinery.ModuleSpec("torchcodec", None)
