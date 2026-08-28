@@ -21,9 +21,41 @@ from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.integrations import use_kernel_forward_from_hub
 from transformers.masking_utils import (
-    create_causal_mask,
-    create_sliding_window_causal_mask,
+    create_causal_mask as _hf_create_causal_mask,
+    create_sliding_window_causal_mask as _hf_create_sliding_window_causal_mask,
 )
+
+import inspect
+
+_CAUSAL_MASK_PARAMS = inspect.signature(_hf_create_causal_mask).parameters
+
+_SLIDING_WINDOW_CAUSAL_MASK_PARAMS = inspect.signature(_hf_create_sliding_window_causal_mask).parameters
+
+def _prepare_mask_kwargs(params, kwargs):
+    if "cache_position" not in params:
+        kwargs.pop("cache_position", None)
+
+    if "inputs_embeds" in params and "input_embeds" in kwargs:
+        kwargs["inputs_embeds"] = kwargs.pop("input_embeds")
+    elif "input_embeds" in params and "inputs_embeds" in kwargs:
+        kwargs["input_embeds"] = kwargs.pop("inputs_embeds")
+
+    return kwargs
+
+def create_causal_mask(**kwargs):
+    kwargs = _prepare_mask_kwargs(
+        _CAUSAL_MASK_PARAMS,
+        kwargs,
+    )
+    return _hf_create_causal_mask(**kwargs)
+
+def create_sliding_window_causal_mask(**kwargs):
+    kwargs = _prepare_mask_kwargs(
+        _SLIDING_WINDOW_CAUSAL_MASK_PARAMS,
+        kwargs,
+    )
+    return _hf_create_sliding_window_causal_mask(**kwargs)
+
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.modeling_layers import GradientCheckpointingLayer
 from transformers.modeling_outputs import BaseModelOutputWithPast
@@ -33,17 +65,21 @@ from transformers.processing_utils import Unpack
 from transformers.utils import ModelOutput, auto_docstring, logging
 from transformers.utils.deprecation import deprecate_kwarg
 try:
-    from transformers.utils.generic import check_model_inputs
-except Exception:
+    from transformers.utils.generic import check_model_inputs as _hf_check_model_inputs
+except ImportError:
+    _hf_check_model_inputs = None
 
-    def check_model_inputs(*args, **kwargs):
-        def _wrap(fn):
-            return fn
 
-        if args and callable(args[0]) and not kwargs:
-            return args[0]
-        return _wrap
+def check_model_inputs():
+    if _hf_check_model_inputs is None:
+        return lambda fn: fn
 
+    try:
+        # Transformers 4.57.2–5.1.x
+        return _hf_check_model_inputs()
+    except TypeError:
+        # Transformers 4.57.0–4.57.1 and 5.4+
+        return _hf_check_model_inputs
 
 def _default_rope_parameters(config, device=None):
     base = config.rope_theta

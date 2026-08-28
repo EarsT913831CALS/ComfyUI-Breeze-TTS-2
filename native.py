@@ -24,7 +24,7 @@ import torch.nn.functional as F
 from torch import nn
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
-from transformers.masking_utils import create_causal_mask
+from transformers.masking_utils import create_causal_mask as _hf_create_causal_mask
 from transformers.modeling_layers import GradientCheckpointingLayer
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
@@ -66,12 +66,31 @@ except ImportError:
 
 # create_causal_mask renamed its embedding kwarg from input_embeds (<5) to
 # inputs_embeds (>=5); pick whichever this installation accepts.
+_CAUSAL_MASK_PARAMS = inspect.signature(_hf_create_causal_mask).parameters
+
 _CAUSAL_MASK_EMBED_KEY = (
     "inputs_embeds"
-    if "inputs_embeds" in inspect.signature(create_causal_mask).parameters
+    if "inputs_embeds" in _CAUSAL_MASK_PARAMS
     else "input_embeds"
 )
 
+def _prepare_mask_kwargs(params, kwargs):
+    if "cache_position" not in params:
+        kwargs.pop("cache_position", None)
+
+    if "inputs_embeds" in params and "input_embeds" in kwargs:
+        kwargs["inputs_embeds"] = kwargs.pop("input_embeds")
+    elif "input_embeds" in params and "inputs_embeds" in kwargs:
+        kwargs["input_embeds"] = kwargs.pop("inputs_embeds")
+
+    return kwargs
+
+def create_causal_mask(**kwargs):
+    kwargs = _prepare_mask_kwargs(
+        _CAUSAL_MASK_PARAMS,
+        kwargs,
+    )
+    return _hf_create_causal_mask(**kwargs)
 
 # Deliberately avoids the substring "flash_attention_2": transformers
 # substring-matches it in get_correct_attn_implementation and would run the
