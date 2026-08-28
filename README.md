@@ -33,6 +33,12 @@ for design/direction. Output is 24 kHz mono.
 
 ## Multi-speaker dialogue
 
+
+
+https://github.com/user-attachments/assets/bf124113-f9ef-4a5d-a501-5935d8fd7b60
+
+
+
 Wire up to 8 **Speaker** nodes into the **Multi-Speaker** node's `speaker_1…8` inputs, then write
 (or paste) the script. Speaker matching is forgiving about case, spaces, and punctuation
 (`Ali G` matches a speaker named `alig`), and every speaker name is validated before any
@@ -76,6 +82,9 @@ speaker, each speaker keeps a stable seed offset across turns (so designed voice
 consistent), and `pause_between_speakers` controls the gap. Reference clips: keep them under
 ~20 s (hard max 60 s). To get an LLM to write scripts in this format, hand it
 [SKILL.md](SKILL.md).
+
+<img width="776" height="1153" alt="Screenshot 2026-08-28 035631" src="https://github.com/user-attachments/assets/be2ad864-bb9d-42b2-a474-ad22315a4dad" />
+
 
 ## Checkpoints
 
