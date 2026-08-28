@@ -24,10 +24,58 @@ INT8 ConvRot quantized builds, and full ComfyUI / AIMDO dynamic-VRAM integration
 | **Breeze TTS 2 Voice Design** | Creates a voice from a natural-language description, no reference audio (CFG 4). |
 | **Breeze TTS 2 Voice Direction** | Clones a reference voice and steers tone, emotion, pace, and delivery with an instruction (CFG 4). `stitch_reference` can play the original reference clip before or after the generated speech in the output. |
 | **Breeze TTS 2 Whisper Transcribe** | Whisper helper that produces the exact transcript cloning needs. |
+| **Breeze TTS 2 Speaker** | One named cast member for Multi-Speaker. Pick a reference clip from the input folder (browse/upload dropdown, or wire audio in) to clone it, or select `none` and write an instruction to design the voice. An empty transcript is auto-transcribed with Whisper and shown on the node. |
+| **Breeze TTS 2 Multi-Speaker** | Generates a whole dialogue script — plain `Name:` lines or pasted JSON — with up to 8 wired speakers, freely mixing cloned and designed voices. |
 
 Vocal events work inline in the text: `(laugh)`, `(cough)`, `(clears throat)`, `(sigh)` in English;
 `[笑]`, `[咳嗽]`, `[清嗓子]`, `[叹气]` in Chinese. Match the instruction language to the text language
 for design/direction. Output is 24 kHz mono.
+
+## Multi-speaker dialogue
+
+Wire up to 8 **Speaker** nodes into the **Multi-Speaker** node's `speaker_1…8` inputs, then write
+(or paste) the script. Speaker matching is forgiving about case, spaces, and punctuation
+(`Ali G` matches a speaker named `alig`), and every speaker name is validated before any
+generation starts, so a bad script fails instantly instead of after burning GPU time.
+
+**Option 1 — plain text.** One `Name: line` per line. A line without a name continues the
+previous speaker; `[Name]:` and markdown `**Name:**` also work:
+
+```
+Ada: (sigh) Who steered my ship into the harbor wall this time?
+Bob: Technically, captain, the harbor steered into us.
+Ada: That is not how harbors work, Bob.
+Bob: If I may, the tide charts were very clear about it.
+```
+
+**Option 2 — pasted JSON.** Ideal for LLM-written scripts. If the text starts with `[` or `{`
+it is parsed as JSON:
+
+```json
+[
+  {"speaker": "Ada", "text": "(sigh) Who steered my ship into the harbor wall this time?"},
+  {"speaker": "Bob", "text": "Technically, captain, the harbor steered into us."},
+  {"speaker": "Ada", "text": "That is not how harbors work, Bob."}
+]
+```
+
+Also accepted: a single `{"speaker": ..., "text": ...}` object, a wrapper like
+`{"script": [...]}`, and the key aliases `speaker`/`name`/`character`/`role` and
+`text`/`line`/`content`/`message`. Inline vocal events work identically in both formats.
+The `text` widget can be converted to an input (right-click) to wire a string from any
+text-generating node.
+
+Before inference the console prints a summary —
+
+```
+[BreezeTTS2] Multi-speaker script: 4 speaker(s), 16 turn(s), ~75s of speech total | cast: Ada (clone), Bob (clone), Carol (design), Dave (design)
+```
+
+— then one progress bar per turn (`[3/16] Bob (~6s)`). Reference clips are encoded once per
+speaker, each speaker keeps a stable seed offset across turns (so designed voices stay
+consistent), and `pause_between_speakers` controls the gap. Reference clips: keep them under
+~20 s (hard max 60 s). To get an LLM to write scripts in this format, hand it
+[SKILL.md](SKILL.md).
 
 ## Checkpoints
 

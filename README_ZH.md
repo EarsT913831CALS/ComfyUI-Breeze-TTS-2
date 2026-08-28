@@ -19,10 +19,55 @@ INT8 ConvRot 量化构建，并完整集成 ComfyUI / AIMDO 动态显存管理�
 | **Breeze TTS 2 Voice Design** | 通过自然语言描述创建声音，无需参考音频（CFG 4）。 |
 | **Breeze TTS 2 Voice Direction** | 克隆参考声音，并用指令控制语气、情绪、语速和表达方式（CFG 4）。`stitch_reference` 可将原始参考片段拼接到生成语音之前或之后输出。 |
 | **Breeze TTS 2 Whisper Transcribe** | Whisper 辅助节点，生成克隆所需的精确转写文本。 |
+| **Breeze TTS 2 Speaker** | 多说话人节点中的一个具名角色。从 input 目录选择参考音频（下拉框支持浏览/上传，也可连线音频输入）进行克隆；或选择 `none` 并填写指令来设计声音。转写文本留空时会用 Whisper 自动转写，并显示在节点上。 |
+| **Breeze TTS 2 Multi-Speaker** | 一次性生成整段对话脚本 —— 支持纯文本 `名字:` 行或直接粘贴 JSON —— 最多接入 8 个说话人，可自由混合克隆声音与设计声音。 |
 
 语气事件可直接写在文本中：英文用 `(laugh)`、`(cough)`、`(clears throat)`、`(sigh)`；
 中文用 `[笑]`、`[咳嗽]`、`[清嗓子]`、`[叹气]`。设计/指令节点的指令语言应与文本语言
 一致。输出为 24 kHz 单声道。
+
+## 多说话人对话
+
+将最多 8 个 **Speaker** 节点接入 **Multi-Speaker** 节点的 `speaker_1…8` 输入，然后编写
+（或粘贴）脚本。说话人名字匹配对大小写、空格和标点宽容（`Ali G` 可匹配名为 `alig` 的说话人），
+且所有名字都会在生成开始前校验 —— 脚本写错会立即报错，不会白白消耗显卡时间。
+
+**方式一 —— 纯文本。** 每行一个 `名字: 台词`。没有名字的行会并入上一位说话人；
+`[名字]:` 和 markdown 的 `**名字:**` 写法同样支持：
+
+```
+Ada: (sigh) 这次又是谁把我的船撞上码头了？
+Bob: 严格来说，船长，是码头撞上了我们。
+Ada: 码头可不是这样运作的，Bob。
+Bob: 恕我直言，潮汐表上写得清清楚楚。
+```
+
+**方式二 —— 粘贴 JSON。** 适合 LLM 生成的脚本。只要文本以 `[` 或 `{` 开头，
+就会按 JSON 解析：
+
+```json
+[
+  {"speaker": "Ada", "text": "(sigh) 这次又是谁把我的船撞上码头了？"},
+  {"speaker": "Bob", "text": "严格来说，船长，是码头撞上了我们。"},
+  {"speaker": "Ada", "text": "码头可不是这样运作的，Bob。"}
+]
+```
+
+同时还接受：单个 `{"speaker": ..., "text": ...}` 对象、`{"script": [...]}` 这类包装，
+以及键名别名 `speaker`/`name`/`character`/`role` 和 `text`/`line`/`content`/`message`。
+内联语气事件在两种格式中完全相同。`text` 控件可转换为输入（右键菜单），
+从而接入任意文本生成节点。
+
+推理开始前，控制台会先打印摘要 ——
+
+```
+[BreezeTTS2] Multi-speaker script: 4 speaker(s), 16 turn(s), ~75s of speech total | cast: Ada (clone), Bob (clone), Carol (design), Dave (design)
+```
+
+—— 然后每个回合显示一条进度条（`[3/16] Bob (~6s)`）。参考音频每位说话人只编码一次；
+每位说话人在所有回合中使用固定的种子偏移（设计的声音因此保持一致）；
+`pause_between_speakers` 控制回合间的停顿。参考音频建议不超过约 20 秒（硬性上限 60 秒）。
+想让 LLM 按此格式编写脚本，把 [SKILL.md](SKILL.md) 交给它即可。
 
 ## 检查点
 

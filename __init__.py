@@ -8,7 +8,7 @@ import logging
 import sys
 import types
 
-__version__ = "v1.3.1"
+__version__ = "v1.4.0"
 
 logger = logging.getLogger("BreezeTTS2")
 logger.propagate = False
@@ -89,6 +89,7 @@ _block_broken_torchcodec()
 
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
+WEB_DIRECTORY = "./web"
 
 try:
     from .loader import register_model_folder

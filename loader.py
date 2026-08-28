@@ -304,7 +304,7 @@ def _register_many_with_comfy(patchers: list) -> None:
         to_load.append(patcher)
     if to_load:
         mm.load_models_gpu(to_load)
-        logger.info("Loaded %d module(s) through ComfyUI memory management.", len(to_load))
+        logger.debug("Loaded %d module(s) through ComfyUI memory management.", len(to_load))
 
 
 def register_runtime_module(module: nn.Module, device: torch.device, *, dynamic: bool | None = None):
@@ -498,11 +498,13 @@ def load_breeze_bundle(
     try:
         # cuda_graphs captures weight addresses at compile time, so the model
         # must stay resident: register it non-dynamic (AIMDO paging off). The
-        # codec is never compiled and pages normally.
+        # codec is pinned too: at ~280MB, dynamic paging just re-staged it on
+        # every decode, spamming a "prepared for dynamic VRAM" line per
+        # multi-speaker turn and adding latency.
         patcher = register_runtime_module(model, device, dynamic=False if decode_mode == "cuda_graphs" else None)
         if patcher is not None:
             patchers.append(patcher)
-        patcher = register_runtime_module(codec, device)
+        patcher = register_runtime_module(codec, device, dynamic=False)
         if patcher is not None:
             patchers.append(patcher)
     except Exception:
