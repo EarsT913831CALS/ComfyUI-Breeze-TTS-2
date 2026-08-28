@@ -45,16 +45,17 @@ Speech runs at roughly **150 words per minute**. Compute the total word budget a
 
 ## Vocal event tags (the ONLY markup allowed)
 
+Confirmed tags — use only these:
+
+- English: `(laugh)` `(cough)` `(clears throat)` `(sigh)`
+- Chinese: `[笑]` `[咳嗽]` `[清嗓子]` `[叹气]`
+
 Place them exactly where the sound should happen, e.g. `"(laugh) You paid WHAT?"`.
-They count toward the words of that turn.
-
-- English: `(laugh)` `(laughs)` `(laughing)` `(cough)` `(coughs)` `(clears throat)`
-  `(sigh)` `(sighs)` `(sniff)` `(sneeze)` `(groan)` `(gasp)` `(hum)`
-- Chinese: `[笑]` `[笑声]` `[咳嗽]` `[清嗓子]` `[叹气]` `[叹息]` `[抽泣]` `[哭]` `[喘息]` `[呼气]`
-
-Use them sparingly (a handful across the whole script) and only where the character's
-personality calls for it. If a reaction isn't on this list, write it as normal words
-("Oh come on") instead of inventing a tag.
+They count toward the words of that turn. Use them sparingly (a handful across the whole
+script) and only where the character's personality calls for it. Close variants like
+`(laughing)` or `(sighs)` usually also work, but prefer the confirmed forms above.
+If a reaction isn't on this list, write it as normal words ("Oh come on") instead of
+inventing a tag.
 
 ## Writing rules
 
