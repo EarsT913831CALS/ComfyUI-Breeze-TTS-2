@@ -72,6 +72,10 @@ _CAUSAL_MASK_EMBED_KEY = (
     else "input_embeds"
 )
 
+# transformers >=5.9 removed the cache_position kwarg from create_causal_mask;
+# pass it only when this installation accepts it.
+_CAUSAL_MASK_ACCEPTS_CACHE_POSITION = "cache_position" in inspect.signature(create_causal_mask).parameters
+
 
 # Deliberately avoids the substring "flash_attention_2": transformers
 # substring-matches it in get_correct_attn_implementation and would run the
@@ -575,8 +579,8 @@ class BreezeDepthDecoderModel(nn.Module):
         causal_mask = create_causal_mask(
             config=self.config,
             attention_mask=attention_mask,
-            cache_position=cache_position,
             past_key_values=past_key_values,
+            **({"cache_position": cache_position} if _CAUSAL_MASK_ACCEPTS_CACHE_POSITION else {}),
             **{_CAUSAL_MASK_EMBED_KEY: inputs_embeds},
         )
         hidden_states = inputs_embeds
@@ -712,9 +716,9 @@ class BreezeBackboneAdapter(nn.Module):
         causal_mask = create_causal_mask(
             config=self.config,
             attention_mask=attention_mask,
-            cache_position=cache_position,
             past_key_values=past_key_values,
             position_ids=position_ids,
+            **({"cache_position": cache_position} if _CAUSAL_MASK_ACCEPTS_CACHE_POSITION else {}),
             **{_CAUSAL_MASK_EMBED_KEY: inputs_embeds},
         )
         hidden_states = inputs_embeds

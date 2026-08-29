@@ -1,8 +1,9 @@
 """Vendored from qwen-tts 0.1.1 (github.com/Qwen/Qwen3-TTS), Apache-2.0.
 
-Only the 12 Hz tokenizer (v2) is vendored. Patched for transformers>=5.3:
-the removed transformers.utils.generic.check_model_inputs is shimmed with a
-no-op decorator.
+Only the 12 Hz tokenizer (v2) is vendored. Patched for transformers 4.57-5.16:
+check_model_inputs is shimmed with a no-op decorator (the upstream symbol kept
+changing calling convention), and mask kwargs are filtered per installed
+signature (cache_position was removed in transformers>=5.9).
 """
 
 from __future__ import annotations
@@ -32,17 +33,24 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import ModelOutput, auto_docstring, logging
 from transformers.utils.deprecation import deprecate_kwarg
-try:
-    from transformers.utils.generic import check_model_inputs
-except Exception:
 
-    def check_model_inputs(*args, **kwargs):
-        def _wrap(fn):
-            return fn
 
-        if args and callable(args[0]) and not kwargs:
-            return args[0]
-        return _wrap
+def check_model_inputs(*args, **kwargs):
+    """No-op shim for transformers' check_model_inputs.
+
+    The upstream symbol changed calling convention repeatedly (factory on
+    4.57.2+, func=None on 5.0-5.1, absent on 5.2-5.3, direct decorator on
+    4.57.0-4.57.1 and 5.4+), so importing it is unsafe across supported
+    versions. It is a validation-only decorator; the codec does not depend
+    on it. Handles both @check_model_inputs and @check_model_inputs().
+    """
+
+    def _wrap(fn):
+        return fn
+
+    if args and callable(args[0]) and not kwargs:
+        return args[0]
+    return _wrap
 
 
 def _default_rope_parameters(config, device=None):
@@ -569,13 +577,25 @@ class Qwen3TTSTokenizerV2DecoderTransformerModel(Qwen3TTSTokenizerV2DecoderPreTr
                 "past_key_values": past_key_values,
                 "position_ids": position_ids,
             }
+            # transformers >=5.9 dropped cache_position from the mask helpers;
+            # pass only the kwargs each installed function actually accepts.
+            import inspect as _inspect
+
+            def _mask_supported(fn):
+                params = _inspect.signature(fn).parameters
+                if any(p.kind is _inspect.Parameter.VAR_KEYWORD for p in params.values()):
+                    return mask_kwargs
+                return {k: v for k, v in mask_kwargs.items() if k in params}
+
             # Create the masks
             causal_mask_mapping = {
-                "full_attention": create_causal_mask(**mask_kwargs),
+                "full_attention": create_causal_mask(**_mask_supported(create_causal_mask)),
             }
             # The sliding window alternating layers are not always activated depending on the config
             if self.has_sliding_layers:
-                causal_mask_mapping["sliding_attention"] = create_sliding_window_causal_mask(**mask_kwargs)
+                causal_mask_mapping["sliding_attention"] = create_sliding_window_causal_mask(
+                    **_mask_supported(create_sliding_window_causal_mask)
+                )
 
         hidden_states = inputs_embeds
 
