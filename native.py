@@ -311,6 +311,15 @@ class BreezeConfig(PretrainedConfig):
         self.head_dim = head_dim if head_dim is not None else self.hidden_size // self.num_attention_heads
 
 
+# Register the custom config types once at module import so AutoConfig (and
+# AutoTokenizer, which resolves the config internally) can handle
+# model_type "breeze". Without this, transformers >=5.16 falls back to a
+# generic PreTrainedConfig whose RoPE standardization crashes on
+# max_position_embeddings (PR #2, P2).
+AutoConfig.register("breeze_depth_decoder_model", BreezeDepthDecoderConfig, exist_ok=True)
+AutoConfig.register("breeze", BreezeConfig, exist_ok=True)
+
+
 # --------------------------------------------------------------------------- #
 # Model blocks (from breeze.py)
 # --------------------------------------------------------------------------- #

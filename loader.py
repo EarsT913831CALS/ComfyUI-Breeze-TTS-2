@@ -455,18 +455,7 @@ def load_breeze_bundle(
     if _ACTIVE_BUNDLE is not None:
         unload_breeze_bundle(_ACTIVE_BUNDLE, reason="load settings changed")
 
-    from transformers import AutoConfig, AutoTokenizer
-
-    AutoConfig.register(
-        "breeze_depth_decoder_model",
-        native.BreezeDepthDecoderConfig,
-        exist_ok=True,
-    )
-    AutoConfig.register(
-        "breeze",
-        native.BreezeConfig,
-        exist_ok=True,
-    )
+    from transformers import AutoTokenizer
 
     quant_map = int8.scan_checkpoint_quantization(wfile)
     config_dict = native.read_config(model_dir)
