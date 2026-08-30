@@ -402,8 +402,14 @@ class _DepthRunner:
         stream.wait_stream(torch.cuda.current_stream())
         with torch.cuda.stream(stream):
             for _ in range(2):
+
+                self.cache.reset()
+
                 fn(static_in, *consts)
         torch.cuda.current_stream().wait_stream(stream)
+
+        self.cache.reset()
+
         graph = torch.cuda.CUDAGraph()
         # thread_local: ComfyUI's server thread (and monitor custom nodes)
         # poll CUDA stats from other threads; process-global capture treats
